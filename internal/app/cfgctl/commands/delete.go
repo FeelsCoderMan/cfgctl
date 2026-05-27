@@ -3,16 +3,24 @@ package commands
 import (
 	"fmt"
 
+	"github.com/FeelsCoderMan/cfgctl/internal/logger"
 	"github.com/FeelsCoderMan/cfgctl/internal/pkg/storage"
 	"github.com/spf13/cobra"
 )
 
 func NewDeleteCmd(fileStore *storage.FileStore) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "delete",
-		Short: "Delete a configuration value by key",
+		Use:     "delete <key>",
+		Short:   "Delete a configuration value by key",
+		Example: "Delete key of name from ./config.json:\ncfgctl --path ./config.json delete name",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmdKind := CommandDelete
+			logger, err := logger.NewLogger(string(cmdKind))
+
+			if err != nil {
+				return err
+			}
+
 			path := cmd.Flag("path").Value.String()
 
 			if path == "" {
@@ -29,6 +37,7 @@ func NewDeleteCmd(fileStore *storage.FileStore) *cobra.Command {
 
 			if err := fileStore.LoadFromPath(); err != nil {
 				commandError := NewCommandError(KindFileStoreLoad, cmdKind, fmt.Errorf("delete: failed to load configuration file %s: %w", path, err))
+				logger.Error(commandError.DetailMessage())
 				return commandError
 			}
 
@@ -36,6 +45,7 @@ func NewDeleteCmd(fileStore *storage.FileStore) *cobra.Command {
 
 			if err := fileStore.Delete(key); err != nil {
 				commandError := NewCommandError(KindFileStoreDelete, cmdKind, fmt.Errorf("delete: failed to delete key %s: %w", key, err))
+				logger.Error(commandError.DetailMessage())
 				return commandError
 			}
 

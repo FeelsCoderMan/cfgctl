@@ -3,16 +3,24 @@ package commands
 import (
 	"encoding/json"
 
+	"github.com/FeelsCoderMan/cfgctl/internal/logger"
 	"github.com/FeelsCoderMan/cfgctl/internal/pkg/storage"
 	"github.com/spf13/cobra"
 )
 
 func NewInitCmd(fileStore *storage.FileStore) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "init",
-		Short: "Initialize a configuration file",
+		Use:     "init",
+		Short:   "Initialize a configuration file",
+		Example: "Initialize a configuration file with data:\ncfgctl init --path ./config.json --data '{\"key\": \"value\"}'",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmdKind := CommandInit
+			logger, err := logger.NewLogger(string(cmdKind))
+
+			if err != nil {
+				return err
+			}
+
 			path := cmd.Flag("path").Value.String()
 			if path == "" {
 				return NewCommandError(KindMissingPath, cmdKind, nil)
@@ -28,7 +36,9 @@ func NewInitCmd(fileStore *storage.FileStore) *cobra.Command {
 			}
 
 			if err := fileStore.LoadData(jsonData); err != nil {
-				return NewCommandError(KindFileStoreLoad, cmdKind, err)
+				commandError := NewCommandError(KindFileStoreLoad, cmdKind, err)
+				logger.Error(commandError.DetailMessage())
+				return commandError
 			}
 
 			if jsonData != nil {

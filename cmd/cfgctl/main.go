@@ -10,12 +10,13 @@ func emptyRunFunc(cmd *cobra.Command, args []string) {}
 
 func main() {
 	var rootCmd = &cobra.Command{
-		Use:   "root",
-		Short: "main Cfgctl CLI root command",
+		Use:   "cfgctl",
+		Short: "cfgctl is a CLI tool for managing configuration files",
 		Run:   emptyRunFunc,
 	}
 
 	rootCmd.PersistentFlags().StringP("path", "p", "", "path of the configuration file")
+	rootCmd.MarkPersistentFlagRequired("path")
 
 	fileStorage := storage.NewFileStore()
 

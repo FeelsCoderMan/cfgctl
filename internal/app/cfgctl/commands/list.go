@@ -1,16 +1,24 @@
 package commands
 
 import (
+	"github.com/FeelsCoderMan/cfgctl/internal/logger"
 	"github.com/FeelsCoderMan/cfgctl/internal/pkg/storage"
 	"github.com/spf13/cobra"
 )
 
 func NewListCmd(fileStore *storage.FileStore) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List all configuration values",
+		Use:     "list",
+		Short:   "List all configuration values",
+		Example: "List all configuration values from ./config.json:\ncfgctl list --path ./config.json",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmdKind := CommandList
+			logger, err := logger.NewLogger(string(cmdKind))
+
+			if err != nil {
+				return err
+			}
+
 			path := cmd.Flag("path").Value.String()
 
 			if path == "" {
@@ -24,7 +32,9 @@ func NewListCmd(fileStore *storage.FileStore) *cobra.Command {
 			fileStore.SetPath(path)
 
 			if err := fileStore.LoadFromPath(); err != nil {
-				return NewCommandError(KindFileStoreLoad, cmdKind, err)
+				commandError := NewCommandError(KindFileStoreLoad, cmdKind, err)
+				logger.Error(commandError.DetailMessage())
+				return commandError
 			}
 
 			result := fileStore.List()

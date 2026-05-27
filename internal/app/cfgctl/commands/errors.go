@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 )
 
 type ErrorKind string
@@ -48,26 +47,11 @@ func (e *CommandError) Unwrap() error {
 	return e.Detail
 }
 
-func (e *CommandError) DetailedErrorMessage() string {
-	if e.errorMessage != "" {
-		return e.errorMessage
+func (e *CommandError) DetailMessage() string {
+	if e.Detail != nil {
+		return e.Detail.Error()
 	}
-
-	seen := map[string]struct{}{}
-	errorLines := []string{e.errorMessage}
-	for err := e.Detail; err != nil; err = errors.Unwrap(err) {
-		s := err.Error()
-		if s == "" {
-			continue
-		}
-		if _, ok := seen[s]; ok {
-			continue
-		}
-		errorLines = append(errorLines, s)
-		seen[s] = struct{}{}
-	}
-
-	return strings.Join(errorLines, "\n")
+	return ""
 }
 
 func (e *CommandError) ErrorMessage() string {

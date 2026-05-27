@@ -13,6 +13,7 @@ GOFLAGS ?=
 
 TESTBIN_DIR := testbin
 PKGS := $(shell go list $(PKG))
+STRIP_PKG_PREFIX_SED := 's|^github\.com/[^/]*/||; s|/|_|g'
 
 all: build
 
@@ -28,20 +29,11 @@ run: build
 	@echo "Running $(BINARY)..."
 	./$(BINARY)
 
-test:
-	ifneq ($(origin TEST_TMP), undefined)
-		@echo "Using TEST_TMP: $(TEST_TMP)"
-		@TEMP=$(TEST_TMP) TMP=$(TEST_TMP) go test $(PKG)
-	else
-		@echo "Running: go test $(PKG)"
-		go test $(PKG)
-	endif
-
 test-compile:
 	@echo "Compiling test binaries into $(TESTBIN_DIR) per package..."
 	@mkdir -p $(TESTBIN_DIR)
 	@for pkg in $(PKGS); do \
-		pkgpath=$$(echo $$pkg | sed 's|/|_|g'); \
+		pkgpath=$$(echo $$pkg | sed $(STRIP_PKG_PREFIX_SED)); \
 		out="$(TESTBIN_DIR)/$${pkgpath}.test.exe"; \
 		echo "Building $$pkg -> $${out}"; \
 		GOOS=$(GOOS) GOARCH=$(GOARCH) go test -c $(GOFLAGS) -o $$out $$pkg || true; \
@@ -61,6 +53,7 @@ test-run: test-compile
 	done; \
 	echo "Test binaries ran successfully."; \
 '
+
 test-run-verbose: test-compile
 	@echo "Running compiled test binaries (verbose with coverage)..."
 	@sh -c '\

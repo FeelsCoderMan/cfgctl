@@ -2,15 +2,11 @@ package storage
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
 	"sync"
 )
-
-var ErrInvalidJSON = errors.New("Invalid JSON")
 
 type Storage interface {
 	Load(data map[string]any) error
@@ -63,10 +59,6 @@ func (fileStore *FileStore) LoadFromPath() error {
 	path := fileStore.path
 	fileStore.mu.RUnlock()
 
-	if path == "" {
-		return fmt.Errorf("Path is not set")
-	}
-
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -74,7 +66,7 @@ func (fileStore *FileStore) LoadFromPath() error {
 
 	var newStorage map[string]any
 	if err := json.Unmarshal(data, &newStorage); err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidJSON, err)
+		return err
 	}
 
 	if err := fileStore.LoadData(newStorage); err != nil {
@@ -88,10 +80,6 @@ func (fileStore *FileStore) save(newStorage map[string]any) error {
 	fileStore.mu.RLock()
 	path := fileStore.path
 	fileStore.mu.RUnlock()
-
-	if path == "" {
-		return fmt.Errorf("Path is not set")
-	}
 
 	data, err := json.Marshal(newStorage)
 	if err != nil {

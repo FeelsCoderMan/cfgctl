@@ -1,6 +1,7 @@
 package commands_test
 
 import (
+	"encoding/json"
 	"errors"
 	"path/filepath"
 	"testing"
@@ -22,21 +23,21 @@ func TestNewInitCmd_Success(t *testing.T) {
 	shouldCorruptData := false
 
 	if err := testutil.CreateTmpFile(tmpPath, data, shouldCorruptData); err != nil {
-		t.Fatalf("init: failed to create tmp file: %v", err)
+		t.Fatalf("init_test: failed to create tmp file: %v", err)
 	}
 
 	err := testutil.RunCmd(rootCmd, "init", "--path", tmpPath, "--data", `{"testKey": "testValue"}`)
 
 	if err != nil {
-		t.Fatalf("init: expected no error, got %v", err)
+		t.Fatalf("init_test: expected no error, got %v", err)
 	}
 
 	if mockFileStorage.GetPath() != tmpPath {
-		t.Fatalf("init: unexpected path: %s", mockFileStorage.GetPath())
+		t.Fatalf("init_test: unexpected path: %s", mockFileStorage.GetPath())
 	}
 
 	if !mockFileStorage.IsDataValid(data) {
-		t.Fatalf("init: data is not valid")
+		t.Fatalf("init_test: data is not valid")
 	}
 }
 
@@ -52,21 +53,21 @@ func TestNewInitCmd_Success_EmptyData(t *testing.T) {
 	shouldCorruptData := false
 
 	if err := testutil.CreateTmpFile(tmpPath, data, shouldCorruptData); err != nil {
-		t.Fatalf("init: failed to create tmp file: %v", err)
+		t.Fatalf("init_test: failed to create tmp file: %v", err)
 	}
 
 	err := testutil.RunCmd(rootCmd, "init", "--path", tmpPath, "--data", `{}`)
 
 	if err != nil {
-		t.Fatalf("init: expected no error, got %v", err)
+		t.Fatalf("init_test: expected no error, got %v", err)
 	}
 
 	if mockFileStorage.GetPath() != tmpPath {
-		t.Fatalf("init: unexpected path: %s", mockFileStorage.GetPath())
+		t.Fatalf("init_test: unexpected path: %s", mockFileStorage.GetPath())
 	}
 
 	if !mockFileStorage.IsDataValid(data) {
-		t.Fatalf("init: data is not valid")
+		t.Fatalf("init_test: data is not valid")
 	}
 }
 
@@ -82,21 +83,21 @@ func TestNewInitCmd_Success_MissingData(t *testing.T) {
 	shouldCorruptData := false
 
 	if err := testutil.CreateTmpFile(tmpPath, data, shouldCorruptData); err != nil {
-		t.Fatalf("init: failed to create tmp file: %v", err)
+		t.Fatalf("init_test: failed to create tmp file: %v", err)
 	}
 
 	err := testutil.RunCmd(rootCmd, "init", "--path", tmpPath)
 
 	if err != nil {
-		t.Fatalf("init: expected no error, got %v", err)
+		t.Fatalf("init_test: expected no error, got %v", err)
 	}
 
 	if mockFileStorage.GetPath() != tmpPath {
-		t.Fatalf("init: unexpected path: %s", mockFileStorage.GetPath())
+		t.Fatalf("init_test: unexpected path: %s", mockFileStorage.GetPath())
 	}
 
 	if !mockFileStorage.IsDataValid(data) {
-		t.Fatalf("init: data is not valid")
+		t.Fatalf("init_test: data is not valid")
 	}
 }
 
@@ -109,16 +110,16 @@ func TestNewInitCmd_Failure_MissingPath(t *testing.T) {
 	err := testutil.RunCmd(rootCmd, "init", "--data", `{"testKey": "testValue"}`)
 
 	if err == nil {
-		t.Fatalf("init: expected error, got nil")
+		t.Fatalf("init_test: expected error, got nil")
 	}
 
 	var cmdError *commands.CommandError
 	if !errors.As(err, &cmdError) {
-		t.Fatalf("init: expected CommandError, got %T: %v", err, err)
+		t.Fatalf("init_test: expected CommandError, got %T (%v)", err, err)
 	}
 
-	if cmdError.Kind != commands.KindMissingPath {
-		t.Fatalf("init: expected MissingPath error, got %v", cmdError.Kind)
+	if cmdError.ErrorKind != commands.KindMissingPath {
+		t.Fatalf("init_test: expected MissingPath error, got %v", cmdError.ErrorKind)
 	}
 }
 
@@ -134,21 +135,26 @@ func TestNewInitCmd_Failure_InvalidData(t *testing.T) {
 	shouldCorruptData := false
 
 	if err := testutil.CreateTmpFile(tmpPath, data, shouldCorruptData); err != nil {
-		t.Fatalf("init: failed to create tmp file: %v", err)
+		t.Fatalf("init_test: failed to create tmp file: %v", err)
 	}
 
 	err := testutil.RunCmd(rootCmd, "init", "--path", tmpPath, "--data", `{"testKey": "testValue":}`)
 
 	if err == nil {
-		t.Fatalf("init: expected error, got nil")
+		t.Fatalf("init_test: expected error, got nil")
 	}
 
 	var cmdError *commands.CommandError
 	if !errors.As(err, &cmdError) {
-		t.Fatalf("init: expected CommandError, got %T: %v", err, err)
+		t.Fatalf("init_test: expected CommandError, got %T (%v)", err, err)
 	}
 
-	if cmdError.Kind != commands.KindInvalidJSON {
-		t.Fatalf("init: expected InvalidJSON error, got %v", cmdError.Kind)
+	if cmdError.ErrorKind != commands.KindInvalidJSON {
+		t.Fatalf("init_test: expected InvalidJSON error, got %v", cmdError.ErrorKind)
+	}
+
+	var syntaxErr *json.SyntaxError
+	if !errors.As(cmdError.Detail, &syntaxErr) {
+		t.Fatalf("init_test: expected SyntaxError, got %T (%v)", cmdError.Detail, cmdError.Detail)
 	}
 }

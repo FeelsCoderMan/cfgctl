@@ -1,9 +1,6 @@
 package commands
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/FeelsCoderMan/cfgctl/internal/pkg/storage"
 	"github.com/spf13/cobra"
 )
@@ -13,36 +10,34 @@ func NewListCmd(fileStore *storage.FileStore) *cobra.Command {
 		Use:   "list",
 		Short: "List all configuration values",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmdKind := CommandList
 			path := cmd.Flag("path").Value.String()
 
 			if path == "" {
-				return NewCommandError(KindMissingPath, fmt.Errorf("list: path is required"))
+				return NewCommandError(KindMissingPath, cmdKind, nil)
 			}
 
 			if len(args) > 0 {
-				return NewCommandError(KindTooManyArgs, fmt.Errorf("list: too many arguments"))
+				return NewCommandError(KindTooManyArgs, cmdKind, nil)
 			}
 
 			fileStore.SetPath(path)
 
 			if err := fileStore.LoadFromPath(); err != nil {
-				if errors.Is(err, storage.ErrInvalidJSON) {
-					return NewCommandError(KindInvalidJSON, err)
-				}
-				return NewCommandError(KindFileStoreLoad, fmt.Errorf("list: failed to load configuration file %s", path))
+				return NewCommandError(KindFileStoreLoad, cmdKind, err)
 			}
 
 			result := fileStore.List()
 
 			if len(result) == 0 {
-				cmd.Println("list: No configuration values found")
+				cmd.Println("list: no configuration values found")
 				return nil
 			} else {
-				cmd.Println("list: Configurations:")
+				cmd.Println("list: configurations:")
 			}
 
 			for key, value := range result {
-				cmd.Printf("\t%s: %v\n", key, value)
+				cmd.Printf("-- %s: %v\n", key, value)
 			}
 
 			return nil

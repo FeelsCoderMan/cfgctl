@@ -1,7 +1,9 @@
 package commands_test
 
 import (
+	"encoding/json"
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -22,21 +24,21 @@ func TestNewListCmd_Success(t *testing.T) {
 	shouldCorruptData := false
 
 	if err := testutil.CreateTmpFile(tmpPath, data, shouldCorruptData); err != nil {
-		t.Fatalf("list: failed to create tmp file: %v", err)
+		t.Fatalf("list_test: failed to create tmp file: %v", err)
 	}
 
 	err := testutil.RunCmd(rootCmd, "list", "--path", tmpPath)
 
 	if err != nil {
-		t.Fatalf("list: expected no error, got %v", err)
+		t.Fatalf("list_test: expected no error, got %v", err)
 	}
 
 	if mockFileStorage.GetPath() != tmpPath {
-		t.Fatalf("list: unexpected path: %s", mockFileStorage.GetPath())
+		t.Fatalf("list_test: unexpected path: %s", mockFileStorage.GetPath())
 	}
 
 	if !mockFileStorage.IsDataValid(data) {
-		t.Fatalf("list: data is not valid")
+		t.Fatalf("list_test: data is not valid")
 	}
 }
 
@@ -49,47 +51,16 @@ func TestNewListCmd_Failure_MissingPath(t *testing.T) {
 	err := testutil.RunCmd(rootCmd, "list")
 
 	if err == nil {
-		t.Fatalf("list: expected error, got nil")
+		t.Fatalf("list_test: expected error, got nil")
 	}
 
 	var cmdError *commands.CommandError
 	if !errors.As(err, &cmdError) {
-		t.Fatalf("list: expected CommandError, got %T: %v", err, err)
+		t.Fatalf("list_test: expected CommandError, got %T (%v)", err, err)
 	}
 
-	if cmdError.Kind != commands.KindMissingPath {
-		t.Fatalf("list: expected MissingPath error, got %v", cmdError.Kind)
-	}
-}
-
-func TestNewListCmd_Failure_InvalidData(t *testing.T) {
-	mockFileStorage := storage.NewMockFileStore()
-	c := commands.NewListCmd(mockFileStorage.FileStore)
-	rootCmd := testutil.NewMockRootCmd()
-	rootCmd.AddCommand(c)
-	tmpDir := testutil.CreatePackageTempDir(t)
-
-	tmpPath := filepath.Join(tmpDir, "config.json")
-	data := map[string]any{"testKey": "testValue"}
-	shouldCorruptData := true
-
-	if err := testutil.CreateTmpFile(tmpPath, data, shouldCorruptData); err != nil {
-		t.Fatalf("list: failed to create tmp file: %v", err)
-	}
-
-	err := testutil.RunCmd(rootCmd, "list", "--path", tmpPath)
-
-	if err == nil {
-		t.Fatalf("list: expected error, got nil")
-	}
-
-	var cmdError *commands.CommandError
-	if !errors.As(err, &cmdError) {
-		t.Fatalf("list: expected CommandError, got %T: %v", err, err)
-	}
-
-	if cmdError.Kind != commands.KindInvalidJSON {
-		t.Fatalf("list: expected InvalidJSON error, got %v", cmdError.Kind)
+	if cmdError.ErrorKind != commands.KindMissingPath {
+		t.Fatalf("list_test: expected MissingPath error, got %v", cmdError.ErrorKind)
 	}
 }
 
@@ -105,16 +76,21 @@ func TestNewListCmd_Failure_MissingFile(t *testing.T) {
 	err := testutil.RunCmd(rootCmd, "list", "--path", tmpPath)
 
 	if err == nil {
-		t.Fatalf("list: expected error on missing file, got nil")
+		t.Fatalf("list_test: expected error on missing file, got nil")
 	}
 
 	var cmdError *commands.CommandError
 	if !errors.As(err, &cmdError) {
-		t.Fatalf("list: expected CommandError, got %v", err)
+		t.Fatalf("list_test: expected CommandError, got %T (%v)", err, err)
 	}
 
-	if cmdError.Kind != commands.KindFileStoreLoad {
-		t.Fatalf("list: expected FileStoreLoad error, got %v", cmdError.Kind)
+	if cmdError.ErrorKind != commands.KindFileStoreLoad {
+		t.Fatalf("list_test: expected FileStoreLoad error, got %v", cmdError.ErrorKind)
+	}
+
+	var pathError *os.PathError
+	if !errors.As(cmdError.Detail, &pathError) {
+		t.Fatalf("list_test: expected PathError error, got %T (%v)", cmdError.Detail, cmdError.Detail)
 	}
 }
 
@@ -130,21 +106,26 @@ func TestNewListCmd_Failure_InvalidFile(t *testing.T) {
 	shouldCorruptData := true
 
 	if err := testutil.CreateTmpFile(tmpPath, data, shouldCorruptData); err != nil {
-		t.Fatalf("list: failed to create tmp file: %v", err)
+		t.Fatalf("list_test: failed to create tmp file: %v", err)
 	}
 
 	err := testutil.RunCmd(rootCmd, "list", "--path", tmpPath)
 
 	if err == nil {
-		t.Fatalf("list: expected error, got nil")
+		t.Fatalf("list_test: expected error, got nil")
 	}
 
 	var cmdError *commands.CommandError
 	if !errors.As(err, &cmdError) {
-		t.Fatalf("list: expected CommandError, got %v", err)
+		t.Fatalf("list_test: expected CommandError, got %T (%v)", err, err)
 	}
 
-	if cmdError.Kind != commands.KindInvalidJSON {
-		t.Fatalf("list: expected InvalidJSON error, got %v", cmdError.Kind)
+	if cmdError.ErrorKind != commands.KindFileStoreLoad {
+		t.Fatalf("list_test: expected FileStoreLoad error, got %v", cmdError.ErrorKind)
+	}
+
+	var syntaxerr *json.SyntaxError
+	if !errors.As(cmdError.Detail, &syntaxerr) {
+		t.Fatalf("list_test: expected JSON error, got %T (%v)", cmdError.Detail, cmdError.Detail)
 	}
 }

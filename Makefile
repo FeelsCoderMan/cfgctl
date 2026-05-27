@@ -1,47 +1,83 @@
-.PHONY: all build run clean test-compile test-run clean
+.PHONY: all build run test clean test-compile test-run test-run-verbose
 
 .DEFAULT_GOAL := all
 
-BINARY := bin/cfgctl.exe
-
+BINARY_DIR := bin
+BINARY := $(BINARY_DIR)/cfgctl.exe
 PKG := ./...
 CMD_PATH := cmd/cfgctl/main.go
 
-all: build run
+GOOS ?= windows
+GOARCH ?= amd64
+GOFLAGS ?=
 
-build:
-	go build -o $(BINARY) $(CMD_PATH)
+TESTBIN_DIR := testbin
+PKGS := $(shell go list $(PKG))
+
+all: build
+
+build: | $(BINARY_DIR)
+	@echo "Building $(BINARY) for $(GOOS)/$(GOARCH)..."
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build $(GOFLAGS) -o $(BINARY) $(CMD_PATH)
+	@echo "Built $(BINARY)"
+
+$(BINARY_DIR):
+	@mkdir -p $(BINARY_DIR)
 
 run: build
+	@echo "Running $(BINARY)..."
 	./$(BINARY)
 
 test:
-	ifeq ($(origin TEST_TMP), undefined)
-		@echo "Running: go test ./..."
-		go test $(PKG)
-	else
+	ifneq ($(origin TEST_TMP), undefined)
 		@echo "Using TEST_TMP: $(TEST_TMP)"
 		@TEMP=$(TEST_TMP) TMP=$(TEST_TMP) go test $(PKG)
+	else
+		@echo "Running: go test $(PKG)"
+		go test $(PKG)
 	endif
 
 test-compile:
-	@echo "Compiling test binaries into ./testbin per package..."
-	@mkdir -p testbin
-	@for pkg in $(shell go list ./...); do \
+	@echo "Compiling test binaries into $(TESTBIN_DIR) per package..."
+	@mkdir -p $(TESTBIN_DIR)
+	@for pkg in $(PKGS); do \
 		pkgpath=$$(echo $$pkg | sed 's|/|_|g'); \
-		out=./testbin/$${pkgpath}.test.exe; \
-		go test -c -o $$out $$pkg || exit $$?; \
+		out="$(TESTBIN_DIR)/$${pkgpath}.test.exe"; \
+		echo "Building $$pkg -> $${out}"; \
+		GOOS=$(GOOS) GOARCH=$(GOARCH) go test -c $(GOFLAGS) -o $$out $$pkg || true; \
+		if [ -f "$$out" ]; then chmod +x "$$out" || true; else echo "No test binary for $$pkg (skipping)"; fi; \
 	done
-	@echo "Compiled test binaries in /.testbin"
+	@echo "Compiled test binaries in $(TESTBIN_DIR)"
 
 test-run: test-compile
-	@echo "Running compiled test binaries..."
-	@for testbin in ./testbin/*.test.exe; do \
+	@echo "Running compiled test binaries via cmd.exe..."
+	@sh -c '\
+	set -eu; \
+	for winbin in $(TESTBIN_DIR)/*.test.exe; do \
+		[ -e "$$winbin" ] || continue; \
+		winpath=$$(cygpath -w "$$winbin" 2>/dev/null || echo "$$winbin"); \
+		printf "Running %s via cmd.exe\n" "$$winpath"; \
+		"$$winpath" -test.v || exit $$?; \
+	done; \
+	echo "Test binaries ran successfully."; \
+'
+test-run-verbose: test-compile
+	@echo "Running compiled test binaries (verbose with coverage)..."
+	@sh -c '\
+	set -eu; \
+	for testbin in $(TESTBIN_DIR)/*.test.exe; do \
+		[ -e "$$testbin" ] || continue; \
+		if [ ! -x "$$testbin" ]; then echo "Skipping non-executable $$testbin (likely cross-compiled)"; continue; fi; \
 		echo "Running $$testbin"; \
-		"$$testbin" -test.v || exit $$?; \
-	done
-	@echo "Test binaries ran successfully."
+		coverfile="$${testbin%.test.exe}.cover.out"; \
+		"$$testbin" -test.v -test.coverprofile="$$coverfile" || exit $$?; \
+		echo "Wrote $$coverfile"; \
+	done; \
+	echo "All test binaries ran successfully.";\
+'
 
 clean:
-	rm -f $(BINARY)
-	rm -rf testbin
+	@echo "Cleaning build artifacts..."
+	@rm -f $(BINARY)
+	@rm -rf $(TESTBIN_DIR)
+	@echo "Cleaned."

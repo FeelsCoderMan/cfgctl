@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/FeelsCoderMan/cfgctl/internal/pkg/storage"
@@ -13,31 +12,31 @@ func NewDeleteCmd(fileStore *storage.FileStore) *cobra.Command {
 		Use:   "delete",
 		Short: "Delete a configuration value by key",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmdKind := CommandDelete
 			path := cmd.Flag("path").Value.String()
 
 			if path == "" {
-				return NewCommandError(KindMissingPath, fmt.Errorf("delete: missing path argument"))
+				return NewCommandError(KindMissingPath, cmdKind, nil)
 			}
 
 			if len(args) < 1 {
-				return NewCommandError(KindMissingArgs, fmt.Errorf("delete: missing key argument"))
+				return NewCommandError(KindMissingArgs, cmdKind, nil)
 			} else if len(args) > 1 {
-				return NewCommandError(KindTooManyArgs, fmt.Errorf("delete: too many arguments"))
+				return NewCommandError(KindTooManyArgs, cmdKind, nil)
 			}
 
 			fileStore.SetPath(path)
 
 			if err := fileStore.LoadFromPath(); err != nil {
-				if errors.Is(err, storage.ErrInvalidJSON) {
-					return NewCommandError(KindInvalidJSON, err)
-				}
-				return NewCommandError(KindFileStoreLoad, fmt.Errorf("delete: failed to load configuration file %s", path))
+				commandError := NewCommandError(KindFileStoreLoad, cmdKind, fmt.Errorf("delete: failed to load configuration file %s: %w", path, err))
+				return commandError
 			}
 
 			key := args[0]
 
 			if err := fileStore.Delete(key); err != nil {
-				return NewCommandError(KindFileStoreDelete, fmt.Errorf("delete: failed to delete key %s", key))
+				commandError := NewCommandError(KindFileStoreDelete, cmdKind, fmt.Errorf("delete: failed to delete key %s: %w", key, err))
+				return commandError
 			}
 
 			cmd.Printf("delete: key %s is deleted from configuration file\n", key)

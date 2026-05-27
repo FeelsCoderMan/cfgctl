@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/FeelsCoderMan/cfgctl/internal/pkg/storage"
@@ -13,32 +12,35 @@ func NewGetCmd(fileStore *storage.FileStore) *cobra.Command {
 		Use:   "get",
 		Short: "Get the value of a configuration key",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmdKind := CommandGet
 			path := cmd.Flag("path").Value.String()
 
 			if path == "" {
-				return NewCommandError(KindMissingPath, fmt.Errorf("get: missing path argument"))
+				return NewCommandError(KindMissingPath, cmdKind, nil)
 			}
 
 			if len(args) < 1 {
-				return NewCommandError(KindMissingArgs, fmt.Errorf("get: missing key argument"))
+				return NewCommandError(KindMissingArgs, cmdKind, nil)
 			} else if len(args) > 1 {
-				return NewCommandError(KindTooManyArgs, fmt.Errorf("get: too many arguments"))
+				return NewCommandError(KindTooManyArgs, cmdKind, nil)
 			}
 
 			fileStore.SetPath(path)
 
 			if err := fileStore.LoadFromPath(); err != nil {
-				if errors.Is(err, storage.ErrInvalidJSON) {
-					return NewCommandError(KindInvalidJSON, err)
-				}
-				return NewCommandError(KindFileStoreLoad, fmt.Errorf("get: failed to load configuration file %s", path))
+				return NewCommandError(KindFileStoreLoad, cmdKind, err)
 			}
 
 			key := args[0]
 			value, err := fileStore.Get(key)
 
 			if err != nil {
-				return NewCommandError(KindFileStoreGet, fmt.Errorf("get: failed to get value from key %s", key))
+				return NewCommandError(KindFileStoreGet, cmdKind, fmt.Errorf("get: failed to get value from key %s %w", key, err))
+			}
+
+			if value == nil {
+				cmd.Printf("get: key %s not found\n", key)
+				return nil
 			}
 
 			cmd.Printf("get: %s = %v\n", key, value)

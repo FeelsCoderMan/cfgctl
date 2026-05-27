@@ -2,7 +2,6 @@ package commands
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/FeelsCoderMan/cfgctl/internal/pkg/storage"
 	"github.com/spf13/cobra"
@@ -13,9 +12,10 @@ func NewInitCmd(fileStore *storage.FileStore) *cobra.Command {
 		Use:   "init",
 		Short: "Initialize a configuration file",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmdKind := CommandInit
 			path := cmd.Flag("path").Value.String()
 			if path == "" {
-				return NewCommandError(KindMissingPath, fmt.Errorf("init: missing required flag ---path"))
+				return NewCommandError(KindMissingPath, cmdKind, nil)
 			}
 
 			fileStore.SetPath(path)
@@ -24,14 +24,19 @@ func NewInitCmd(fileStore *storage.FileStore) *cobra.Command {
 			data, _ := cmd.Flags().GetString("data")
 
 			if err := json.Unmarshal([]byte(data), &jsonData); err != nil {
-				return NewCommandError(KindInvalidJSON, fmt.Errorf("init: invalid JSON in --data"))
+				return NewCommandError(KindInvalidJSON, cmdKind, err)
 			}
 
 			if err := fileStore.LoadData(jsonData); err != nil {
-				return NewCommandError(KindFileStoreLoad, fmt.Errorf("init: failed to load configuration from %s", path))
+				return NewCommandError(KindFileStoreLoad, cmdKind, err)
 			}
 
-			cmd.Println("init: configuration initialized successfully")
+			if jsonData != nil {
+				cmd.Printf("init: configuration is saved to %s with data\n", path)
+			} else {
+				cmd.Printf("init: configuration file is created to %s\n", path)
+			}
+
 			return nil
 		},
 	}

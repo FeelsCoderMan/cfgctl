@@ -1,7 +1,9 @@
 package commands_test
 
 import (
+	"encoding/json"
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -22,24 +24,24 @@ func TestNewSetCmd_Success(t *testing.T) {
 	shouldCorruptData := false
 
 	if err := testutil.CreateTmpFile(tmpPath, data, shouldCorruptData); err != nil {
-		t.Fatalf("set: failed to create tmp file: %v", err)
+		t.Fatalf("set_test: failed to create tmp file: %v", err)
 	}
 
 	key := "name"
 	err := testutil.RunCmd(rootCmd, "set", "--path", tmpPath, key, "Bob")
 
 	if err != nil {
-		t.Fatalf("set: expected no error on execution of set command, got %v", err)
+		t.Fatalf("set_test: expected no error on execution of set command, got %v", err)
 	}
 
 	value, err := mockFileStorage.FileStore.Get(key)
 
 	if err != nil {
-		t.Fatalf("set: expected no error, got %v", err)
+		t.Fatalf("set_test: expected no error, got %v", err)
 	}
 
 	if value != "Bob" {
-		t.Fatalf("set: expected value 'Bob', got %v", value)
+		t.Fatalf("set_test: expected value 'Bob', got %v", value)
 	}
 }
 
@@ -55,22 +57,22 @@ func TestNewSetCmd_Failure_MissingPath(t *testing.T) {
 	shouldCorruptData := false
 
 	if err := testutil.CreateTmpFile(tmpPath, data, shouldCorruptData); err != nil {
-		t.Fatalf("set: failed to create tmp file: %v", err)
+		t.Fatalf("set_test: failed to create tmp file: %v", err)
 	}
 
 	err := testutil.RunCmd(rootCmd, "set", "name", "Bob")
 
 	if err == nil {
-		t.Fatalf("set: expected error on missing path, got nil")
+		t.Fatalf("set_test: expected error on missing path, got nil")
 	}
 
 	var cmdError *commands.CommandError
 	if !errors.As(err, &cmdError) {
-		t.Fatalf("set: expected CommandError, got %v", err)
+		t.Fatalf("set_test: expected CommandError, got %T (%v)", err, err)
 	}
 
-	if cmdError.Kind != commands.KindMissingPath {
-		t.Fatalf("set: expected MissingPath error, got %v", cmdError.Kind)
+	if cmdError.ErrorKind != commands.KindMissingPath {
+		t.Fatalf("set_test: expected MissingPath error, got %v", cmdError.ErrorKind)
 	}
 }
 
@@ -86,22 +88,22 @@ func TestNewSetCmd_Failure_MissingKey(t *testing.T) {
 	shouldCorruptData := false
 
 	if err := testutil.CreateTmpFile(tmpPath, data, shouldCorruptData); err != nil {
-		t.Fatalf("set: failed to create tmp file: %v", err)
+		t.Fatalf("set_test: failed to create tmp file: %v", err)
 	}
 
 	err := testutil.RunCmd(rootCmd, "set", "--path", tmpPath, "Bob")
 
 	if err == nil {
-		t.Fatalf("set: expected error on missing key, got nil")
+		t.Fatalf("set_test: expected error on missing key, got nil")
 	}
 
 	var cmdError *commands.CommandError
 	if !errors.As(err, &cmdError) {
-		t.Fatalf("set: expected CommandError, got %v", err)
+		t.Fatalf("set_test: expected CommandError, got %T (%v)", err, err)
 	}
 
-	if cmdError.Kind != commands.KindMissingArgs {
-		t.Fatalf("set: expected MissingArgs error, got %v", cmdError.Kind)
+	if cmdError.ErrorKind != commands.KindMissingArgs {
+		t.Fatalf("set_test: expected MissingArgs error, got %v", cmdError.ErrorKind)
 	}
 }
 
@@ -117,16 +119,21 @@ func TestNewSetCmd_Failure_MissingFile(t *testing.T) {
 	err := testutil.RunCmd(rootCmd, "set", "--path", tmpPath, "name", "Bob")
 
 	if err == nil {
-		t.Fatalf("set: expected error on missing file, got nil")
+		t.Fatalf("set_test: expected error on missing file, got nil")
 	}
 
 	var cmdError *commands.CommandError
 	if !errors.As(err, &cmdError) {
-		t.Fatalf("set: expected CommandError, got %v", err)
+		t.Fatalf("set_test: expected CommandError, got %T (%v)", err, err)
 	}
 
-	if cmdError.Kind != commands.KindFileStoreLoad {
-		t.Fatalf("set: expected FileStoreLoad error, got %v", cmdError.Kind)
+	if cmdError.ErrorKind != commands.KindFileStoreLoad {
+		t.Fatalf("set_test: expected FileStoreLoad error, got %v", cmdError.ErrorKind)
+	}
+
+	var pathError *os.PathError
+	if !errors.As(cmdError.Detail, &pathError) {
+		t.Fatalf("set_test: expected PathError error, got %T (%v)", cmdError.Detail, cmdError.Detail)
 	}
 }
 
@@ -142,21 +149,26 @@ func TestNewSetCmd_Failure_InvalidFile(t *testing.T) {
 	shouldCorruptData := true
 
 	if err := testutil.CreateTmpFile(tmpPath, data, shouldCorruptData); err != nil {
-		t.Fatalf("set: failed to create tmp file: %v", err)
+		t.Fatalf("set_test: failed to create tmp file: %v", err)
 	}
 
 	err := testutil.RunCmd(rootCmd, "set", "--path", tmpPath, "name", "Bob")
 
 	if err == nil {
-		t.Fatalf("set: expected error on invalid file, got nil")
+		t.Fatalf("set_test: expected error on invalid file, got nil")
 	}
 
 	var cmdError *commands.CommandError
 	if !errors.As(err, &cmdError) {
-		t.Fatalf("set: expected CommandError, got %v", err)
+		t.Fatalf("set_test: expected CommandError, got %T (%v)", err, err)
 	}
 
-	if cmdError.Kind != commands.KindInvalidJSON {
-		t.Fatalf("set: expected InvalidJSON error, got %v", cmdError.Kind)
+	if cmdError.ErrorKind != commands.KindFileStoreLoad {
+		t.Fatalf("set_test: expected FileStoreLoad error, got %v", cmdError.ErrorKind)
+	}
+
+	var syntaxErr *json.SyntaxError
+	if !errors.As(cmdError.Detail, &syntaxErr) {
+		t.Fatalf("set_test: expected SyntaxError, got %T (%v)", cmdError.Detail, cmdError.Detail)
 	}
 }
